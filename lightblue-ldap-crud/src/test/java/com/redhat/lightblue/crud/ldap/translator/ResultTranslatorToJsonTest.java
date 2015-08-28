@@ -22,6 +22,9 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 
 import java.math.BigInteger;
+import java.text.DateFormat;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.UUID;
@@ -239,22 +242,25 @@ public class ResultTranslatorToJsonTest {
     }
 
     @Test
-    public void testTranslate_SimpleField_Date() throws JSONException{
+    public void testTranslate_SimpleField_Date() throws JSONException, ParseException {
+        String date = "20150109201731.570Z";
+
         //Note in and out data are formatted differently
         SearchResultEntry result = new SearchResultEntry(-1, "uid=john.doe,dc=example,dc=com", new Attribute[]{
-                new Attribute("key", "20150109201731.570Z")
+                new Attribute("key", date)
         });
 
         EntityMetadata md = fakeEntityMetadata("fakeMetadata",
                 new SimpleField("key", DateType.TYPE)
-                );
+        );
 
         JsonDoc document = new ResultTranslatorToJson(factory, md, new TrivialLdapFieldNameTranslator()).translate(result);
 
         assertNotNull(document);
 
+        String expectedDate = DateType.getDateFormat().format(new SimpleDateFormat("yyyyMMddHHmmss.SSS'Z'").parse(date));
         JSONAssert.assertEquals(
-                "{\"key\":\"20150109T20:17:31.570+0000\",\"dn\":\"uid=john.doe,dc=example,dc=com\"}",
+                "{\"key\":\"" + expectedDate + "\",\"dn\":\"uid=john.doe,dc=example,dc=com\"}",
                 document.toString(),
                 true);
     }
