@@ -186,8 +186,25 @@ public class LdapCRUDController implements CRUDController {
     public CRUDUpdateResponse update(CRUDOperationContext ctx,
             QueryExpression query, UpdateExpression update,
             Projection projection) {
-        // TODO Auto-generated method stub
-        return null;
+
+        if (query == null) {
+            throw new IllegalArgumentException("No query was provided.");
+        }
+
+        EntityMetadata md = ctx.getEntityMetadata(ctx.getEntityName());
+        LdapDataStore store = LdapCrudUtil.getLdapDataStore(md);
+
+        CRUDUpdateResponse updateResponse = new CRUDUpdateResponse();
+        updateResponse.setNumMatched(0);
+        updateResponse.setNumFailed(0);
+        updateResponse.setNumUpdated(0);
+
+        LDAPConnection connection = getNewLdapConnection(store);
+
+        LdapFieldNameTranslator fieldNameTranslator = LdapCrudUtil.getLdapFieldNameTranslator(md);
+
+
+        return updateResponse;
     }
 
     @Override
