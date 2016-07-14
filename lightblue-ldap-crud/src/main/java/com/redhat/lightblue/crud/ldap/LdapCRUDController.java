@@ -45,6 +45,7 @@ import com.redhat.lightblue.crud.CrudConstants;
 import com.redhat.lightblue.crud.DocCtx;
 import com.redhat.lightblue.crud.ListDocumentStream;
 import com.redhat.lightblue.crud.ldap.translator.EntryTranslatorFromJson;
+import com.redhat.lightblue.crud.ldap.translator.ModificationTranslator;
 import com.redhat.lightblue.crud.ldap.translator.ModificationTranslatorFromJson;
 import com.redhat.lightblue.crud.ldap.translator.ResultTranslatorToJson;
 import com.redhat.lightblue.crud.ldap.translator.SortTranslator;
@@ -66,6 +67,7 @@ import com.redhat.lightblue.util.Path;
 import com.unboundid.ldap.sdk.LDAPConnection;
 import com.unboundid.ldap.sdk.LDAPException;
 import com.unboundid.ldap.sdk.LDAPResult;
+import com.unboundid.ldap.sdk.Modification;
 import com.unboundid.ldap.sdk.ModifyRequest;
 import com.unboundid.ldap.sdk.ResultCode;
 import com.unboundid.ldap.sdk.SearchRequest;
@@ -187,22 +189,31 @@ public class LdapCRUDController implements CRUDController {
             QueryExpression query, UpdateExpression update,
             Projection projection) {
 
-        if (query == null) {
-            throw new IllegalArgumentException("No query was provided.");
-        }
-
-        EntityMetadata md = ctx.getEntityMetadata(ctx.getEntityName());
-        LdapDataStore store = LdapCrudUtil.getLdapDataStore(md);
-
         CRUDUpdateResponse updateResponse = new CRUDUpdateResponse();
         updateResponse.setNumMatched(0);
         updateResponse.setNumFailed(0);
         updateResponse.setNumUpdated(0);
 
-        LDAPConnection connection = getNewLdapConnection(store);
-
+        EntityMetadata md = ctx.getEntityMetadata(ctx.getEntityName());
         LdapFieldNameTranslator fieldNameTranslator = LdapCrudUtil.getLdapFieldNameTranslator(md);
-
+        List<Modification> mods = new ModificationTranslator(fieldNameTranslator).translate(update, md);
+        
+        runSearch(ctx, query,
+                (SearchResultEntry entry, LDAPConnection connection) -> {
+                    try {
+                        LDAPResult updateResult = connection.modify(entry.getDN(), mods);
+                        if (ResultCode.SUCCESS.equals(updateResult.getResultCode())) {
+                            updateResponse.setNumUpdated(updateResponse.getNumUpdated() + 1);
+                        } else {
+                            ctx.addError(Error.get("ldap:update",
+                                    LdapErrorCode.ERR_LDAP_UNSUCCESSFUL_RESPONSE,
+                                    updateResult.getResultCode().toString()));
+                        }
+                    } catch (LDAPException e) {
+                        ctx.addError(Error.get(LdapErrorCode.ERR_LDAP_REQUEST_FAILED, e));
+                    }
+                },
+                translateFieldNames(fieldNameTranslator, gatherRequiredFields(md, projection, query, null)).toArray(new String[0]));
 
         return updateResponse;
     }
