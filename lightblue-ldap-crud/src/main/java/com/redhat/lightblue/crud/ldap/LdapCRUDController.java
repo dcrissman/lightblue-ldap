@@ -33,13 +33,13 @@ import com.redhat.lightblue.common.ldap.LdapFieldNameTranslator;
 import com.redhat.lightblue.crud.CRUDController;
 import com.redhat.lightblue.crud.CRUDDeleteResponse;
 import com.redhat.lightblue.crud.CRUDFindResponse;
+import com.redhat.lightblue.crud.CRUDHealth;
 import com.redhat.lightblue.crud.CRUDInsertionResponse;
 import com.redhat.lightblue.crud.CRUDOperationContext;
 import com.redhat.lightblue.crud.CRUDSaveResponse;
 import com.redhat.lightblue.crud.CRUDUpdateResponse;
 import com.redhat.lightblue.crud.CrudConstants;
 import com.redhat.lightblue.crud.DocCtx;
-import com.redhat.lightblue.crud.CRUDHealth;
 import com.redhat.lightblue.crud.ListDocumentStream;
 import com.redhat.lightblue.crud.ldap.translator.EntryTranslatorFromJson;
 import com.redhat.lightblue.crud.ldap.translator.ModificationTranslator;
@@ -192,25 +192,30 @@ public class LdapCRUDController implements CRUDController {
         updateResponse.setNumUpdated(0);
 
         EntityMetadata md = ctx.getEntityMetadata(ctx.getEntityName());
+        LdapDataStore store = LdapCrudUtil.getLdapDataStore(md);
         LdapFieldNameTranslator fieldNameTranslator = LdapCrudUtil.getLdapFieldNameTranslator(md);
         List<Modification> mods = new ModificationTranslator(fieldNameTranslator).translate(update, md);
-        
-        runSearch(ctx, query,
-                (SearchResultEntry entry, LDAPConnection connection) -> {
-                    try {
-                        LDAPResult updateResult = connection.modify(entry.getDN(), mods);
-                        if (ResultCode.SUCCESS.equals(updateResult.getResultCode())) {
+
+        SearchRequest searchRequest = null; //TODO
+
+        LDAPConnection connection = getLdapConnection(store);
+
+        runSearch(connection, searchRequest, ctx,
+                (SearchResultEntry entry) -> {
+                    execute(ctx, new ExecutionHandler() {
+
+                        @Override
+                        void onSuccess(LDAPResult deleteResult) {
                             updateResponse.setNumUpdated(updateResponse.getNumUpdated() + 1);
-                        } else {
-                            ctx.addError(Error.get("ldap:update",
-                                    LdapErrorCode.ERR_LDAP_UNSUCCESSFUL_RESPONSE,
-                                    updateResult.getResultCode().toString()));
                         }
-                    } catch (LDAPException e) {
-                        ctx.addError(Error.get(LdapErrorCode.ERR_LDAP_REQUEST_FAILED, e));
-                    }
-                },
-                translateFieldNames(fieldNameTranslator, gatherRequiredFields(md, projection, query, null)).toArray(new String[0]));
+
+                        @Override
+                        LDAPResult execute() throws LDAPException {
+                            //TODO
+                            return null;
+                        }
+                    });
+                });
 
         return updateResponse;
     }
@@ -558,7 +563,7 @@ public class LdapCRUDController implements CRUDController {
         abstract void onSuccess(LDAPResult result);
 
     }
-    
+
     @Override
     public CRUDHealth checkHealth() {
         boolean isHealthy = true;
