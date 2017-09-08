@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -568,21 +569,21 @@ public class LdapCRUDController implements CRUDController {
     public CRUDHealth checkHealth() {
         boolean isHealthy = true;
         Map<String, Object> ldapConnnectionsStatus = dbResolver.getLDAPConnectionsStatus();
-        List<String> details = new ArrayList<>(ldapConnnectionsStatus.size());
+        Map<String, Object> details = new LinkedHashMap<>();
 
         for (Map.Entry<String, Object> connectionStatus : ldapConnnectionsStatus.entrySet()) {
 
             if (connectionStatus.getValue() instanceof LDAPException) {
                 isHealthy = false;
-                details.add(new StringBuilder("LDAPConnection [DatabaseName: ").append(connectionStatus.getKey())
+                details.put("LDAPException", new StringBuilder("LDAPConnection [DatabaseName: ").append(connectionStatus.getKey())
                         .append(", Status: ").append(connectionStatus.getValue()).toString());
             } else {
                 isHealthy = (Boolean) connectionStatus.getValue();
 
-                details.add(new StringBuilder("LDAPConnection [DatabaseName: ").append(connectionStatus.getKey())
+                details.put("exception", new StringBuilder("LDAPConnection [DatabaseName: ").append(connectionStatus.getKey())
                         .append(", Status: ").append(connectionStatus.getValue()).toString());
             }
         }
-        return new CRUDHealth(isHealthy, details.toString());
+        return new CRUDHealth(isHealthy, details);
     }
 }
